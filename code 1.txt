@@ -1,0 +1,126 @@
+import requests
+import pandas as pd
+import numpy as np
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.metrics import mean_absolute_error
+
+# NASA Exoplanet Archive API URL
+URL = "https://exoplanetarchive.ipac.caltech.edu/TAP/sync?query=select+pl_name,pl_rade,pl_bmasse,pl_orbper,pl_eqt,st_teff,st_mass,st_rad,st_met+from+pscomppars&format=json"
+
+# Fetch data from NASA's API
+response = requests.get(URL)
+if response.status_code == 200:
+    data = response.json()
+    print("\n✅ Successfully fetched data from NASA Exoplanet Archive!")
+else:
+    print("\n❌ Failed to fetch data. Status Code:", response.status_code)
+    exit()
+
+# Convert JSON data to DataFrame
+df = pd.DataFrame(data)
+numeric_columns = ['pl_rade', 'pl_bmasse', 'pl_orbper', 'pl_eqt', 'st_teff', 'st_mass', 'st_rad', 'st_met']
+df[numeric_columns] = df[numeric_columns].apply(pd.to_numeric, errors='coerce')
+df = df.dropna(subset=numeric_columns)
+
+# Mass Scoring Adjustment
+def mass_score(mass):
+    if mass <= 2:
+        return mass * 10  # Favor Earth-like mass
+    elif 2 < mass <= 5:
+        return 20 - (mass - 2) * 5  # Reduce score for super-Earths
+    else:
+        return 0  # Too large to be habitable
+
+# Star Temperature Scoring Adjustment
+def star_score(teff):
+    if 5000 <= teff <= 7000:
+        return max(0, (7000 - abs(teff - 5800)) / 100)
+    return 0
+
+# Orbit Stability Score
+def stability_score(orbital_period):
+    if orbital_period < 50 or orbital_period > 500:
+        return 0  # Too unstable
+    return min(10, 10 - abs(orbital_period - 365) / 50)
+
+# Rule-Based Habitability Score Calculation
+def rule_based_score(row):
+    if row['pl_rade'] > 3:
+        return 0  # Gas giants are uninhabitable
+    
+    mass_component = mass_score(row['pl_bmasse'])
+    temp_component = max(0, (300 - abs(row['pl_eqt'] - 300)) / 3) if 200 <= row['pl_eqt'] <= 400 else 0
+    star_component = star_score(row['st_teff'])
+    orbit_component = stability_score(row['pl_orbper'])
+    
+    return min(100, mass_component + temp_component + star_component + orbit_component)
+
+df['rule_habitability_score'] = df.apply(rule_based_score, axis=1)
+df['habitability_score'] = df['rule_habitability_score']
+
+# Machine Learning Model Training
+X = df[numeric_columns]
+y = df['habitability_score']
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+model = RandomForestRegressor(n_estimators=100, random_state=42)
+model.fit(X_train, y_train)
+y_pred = model.predict(X_test)
+print(f"\n📊 Model trained! Mean Absolute Error: {mean_absolute_error(y_test, y_pred):.2f}")
+
+# Atmosphere Potential Estimation
+def atmosphere_potential(mass, radius):
+    if mass <= 0.5:
+        return 0  # No atmosphere
+    elif 0.5 < mass <= 2.5:
+        return 10  # Earth-like atmosphere
+    elif mass > 5:
+        return 2  # Thick, non-breathable atmosphere
+    return 5
+
+# Terraformability Score Calculation
+def terraformability_score(row):
+    if row['pl_rade'] > 3:
+        return 0  # Gas giants cannot be terraformed
+    
+    gravity_score = max(0, 10 - abs(row['pl_bmasse'] - 1) * 2)
+    temp_score = max(0, 10 - abs(row['pl_eqt'] - 288) / 10) if 230 <= row['pl_eqt'] <= 330 else 0
+    atmosphere_score = atmosphere_potential(row['pl_bmasse'], row['pl_rade'])
+    water_score = 10 if 273 <= row['pl_eqt'] <= 373 else 0  # Favor planets with liquid water
+    
+    return min(100, (gravity_score + temp_score + atmosphere_score + water_score) * 2.5)
+
+df['terraformability_score'] = df.apply(terraformability_score, axis=1)
+
+# Habitability Prediction Function
+def predict_habitability(planet_data):
+    planet_features = pd.DataFrame([planet_data[numeric_columns].astype(float)], columns=numeric_columns)
+    prediction = model.predict(planet_features)[0]
+    return min(100, round(prediction, 2))
+
+# Main Execution
+def main():
+    while True:
+        planet_name = input("\nEnter exoplanet name (or type 'exit' to quit): ").strip()
+        
+        if planet_name.lower() == 'exit':
+            print("\n👋 Exiting program. Goodbye!")
+            break
+        
+        planet_data = df[df['pl_name'].str.lower() == planet_name.lower()]
+        
+        if planet_data.empty:
+            print("\n❌ Planet not found in the database. Please try again.")
+            continue
+        
+        planet_data = planet_data.iloc[0]
+        ml_score = predict_habitability(planet_data)
+        rule_score = planet_data['rule_habitability_score']
+        terra_score = planet_data['terraformability_score']
+        
+        print(f"\n🌍 ML Habitability Prediction for {planet_name}: {ml_score}%")
+        print(f"🔬 Rule-Based Habitability Score: {rule_score}%")
+        print(f"🌱 Terraformability Score: {terra_score}%\n")
+
+if __name__ == "__main__":
+    main()
