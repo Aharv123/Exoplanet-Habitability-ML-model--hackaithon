@@ -10,7 +10,7 @@ Exo3.0.ipynb = uses stabilityai/stablelm-zephyr-3b to generate AI reasoning - [N
 Exo4.0.ipynb - uses mistralai/Mistral-7B-Instruct-v0.1 to generate AI reasoning - [Give somewhere Accurate texts and data]
 
 
-Exo5.0.ipynb - uses gemini-2.0-flash to generate AI reasoning - [Gives Perfect AI reasoning]
+Exo5.0       - uses gemini-2.0-flash to generate AI reasoning - [Gives Perfect AI reasoning]  No Gemini Api key is given here cause we are not stupid. LoL!!
 
 
 Exo6.0.ipynb - uses facebook/galactica-1.3b to generate - [Give somewhere Accurate texts and data]
