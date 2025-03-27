@@ -1,7 +1,7 @@
 
 DETAILS:
 
-Whole Project Link [With Frotend Implementation] - https://exploratory-planet-analysis.vercel.app/
+Whole Project Link [With Frontend Implementation] - https://exploratory-planet-analysis.vercel.app/
 
 Exo5.1.ipynb - uses gemini-2.0-flash to generate AI reasoning - [Gives Perfect AI reasoning]  
 
